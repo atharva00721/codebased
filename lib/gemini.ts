@@ -1,8 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Document } from "@langchain/core/documents";
+import * as dotenv from "dotenv";
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI("AIzaSyCHGqbXMZWMHYZc9AuSdaaJY09VJqna2Zw");
+dotenv.config();
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // Store chat sessions by project ID with LRU mechanism to prevent memory leaks
