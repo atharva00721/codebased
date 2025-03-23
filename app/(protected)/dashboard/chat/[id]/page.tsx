@@ -1,0 +1,386 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useUser } from "@clerk/nextjs";
+import { Message, UserProfile } from "./types";
+import { getCodeSegment } from "./utils";
+import { UserProfileHeader } from "./_components/UserProfileHeader";
+import { InitializationScreen } from "./_components/InitializationScreen";
+import { EmptyChat } from "./_components/EmptyChat";
+import { ChatMessage } from "./_components/ChatMessage";
+import { MessageInput } from "./_components/MessageInput";
+import { Button } from "@/components/ui/button";
+
+export default function ChatPage() {
+  // Fix the typing for useParams
+  const params = useParams();
+  const projectId = params?.id as string;
+
+  // Get current user from Clerk
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Store chat history for context
+  const chatHistoryRef = useRef<Message[]>([]);
+
+  // Fetch user profile from database
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!isClerkLoaded || !clerkUser) return;
+
+      setIsLoadingProfile(true);
+      try {
+        const response = await fetch("/api/user/profile");
+        if (!response.ok) {
+          throw new Error("Failed to fetch user profile");
+        }
+        const userData = await response.json();
+        setUserProfile(userData);
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        // If DB fetch fails, use Clerk data as fallback
+        setUserProfile({
+          id: clerkUser.id,
+          firstName: clerkUser.firstName || "",
+          lastName: clerkUser.lastName || "",
+          emailAddress: clerkUser.emailAddresses[0]?.emailAddress || "",
+          imageUrl: clerkUser.imageUrl,
+          credits: 0,
+        });
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [clerkUser, isClerkLoaded]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // When messages change, update the chat history reference
+  useEffect(() => {
+    // Filter out messages with empty content and store the last 10 messages for context
+    chatHistoryRef.current = messages
+      .filter((msg) => msg.content.trim() !== "")
+      .slice(-10);
+  }, [messages]);
+
+  // Check if RAG is initialized for this project
+  useEffect(() => {
+    const checkInitialization = async () => {
+      try {
+        // Add API call to check if repository is initialized
+        const response = await fetch("/api/rag/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+
+        const data = await response.json();
+        setIsInitialized(data.initialized);
+      } catch (error) {
+        console.error("Failed to check initialization status:", error);
+      }
+    };
+
+    if (projectId) {
+      checkInitialization();
+    }
+  }, [projectId]);
+
+  // Initialize RAG for the project
+  const initializeRAG = async () => {
+    if (isInitializing) return;
+
+    setIsInitializing(true);
+    try {
+      const response = await fetch("/api/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          action: "initialize",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast("Repository initialized", {
+          description: `${result.newEmbeddings} new embeddings created.`,
+        });
+        setIsInitialized(true);
+
+        // Add assistant welcome message
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "I've analyzed your repository and I'm ready to answer questions about your code.",
+            timestamp: new Date(),
+          },
+        ]);
+      } else {
+        toast("Failed to initialize", {
+          description: result.message || "Unknown error occurred",
+        });
+      }
+    } catch (error) {
+      console.error("Error initializing RAG:", error);
+      toast("Error", {
+        description: "Failed to initialize repository for RAG.",
+      });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // Submit message and get AI response - optimized version
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!input.trim() || isLoading) return;
+
+    // Add user message
+    const userMessage: Message = {
+      role: "user",
+      content: input.trim(), // Ensure content is trimmed
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    // Generate a unique ID for the streaming message
+    const streamingMessageId = crypto.randomUUID?.() || `msg-${Date.now()}`;
+
+    // Add initial empty assistant message for streaming
+    const initialAiMessage: Message = {
+      id: streamingMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, initialAiMessage]);
+
+    try {
+      // Format message history for API
+      const messageHistory = chatHistoryRef.current.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      const response = await fetch("/api/rag/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          query: input.trim(),
+          messageHistory,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(
+          !response.ok ? "API response error" : "Stream not supported"
+        );
+      }
+
+      // Read the stream with optimized parsing
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+      let sources = [];
+      let lastUpdateTime = Date.now();
+      const updateInterval = 100; // Update UI at most every 100ms
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+
+        try {
+          // Check if the chunk is a special message indicating sources
+          if (chunk.includes("__SOURCES__:")) {
+            const parts = chunk.split("__SOURCES__:");
+            if (parts[0]) accumulatedContent += parts[0];
+
+            if (parts[1]) {
+              sources = JSON.parse(parts[1]);
+            }
+            continue;
+          }
+
+          // Otherwise treat it as regular content
+          accumulatedContent += chunk;
+
+          // Throttle UI updates for better performance
+          const now = Date.now();
+          if (now - lastUpdateTime >= updateInterval) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageId
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              )
+            );
+            lastUpdateTime = now;
+          }
+        } catch (e) {
+          console.error("Error parsing chunk:", e);
+        }
+      }
+
+      // Final update with complete message
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === streamingMessageId
+            ? {
+                ...msg,
+                content: accumulatedContent,
+                sources,
+                isStreaming: false,
+              }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error("Error querying RAG:", error);
+      toast("Error", {
+        description: "Failed to get a response. Please try again.",
+      });
+
+      // Remove the streaming message on error
+      setMessages((prev) =>
+        prev.filter((msg) => msg.id !== streamingMessageId)
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add a function to clear chat history
+  const clearChat = async () => {
+    if (isLoading) return;
+
+    setMessages([]);
+
+    // Clear chat history on the server
+    try {
+      await fetch("/api/rag/clear-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+
+      // Add welcome message
+      setMessages([
+        {
+          role: "assistant",
+          content: "Chat history cleared. How can I help you with your code?",
+          timestamp: new Date(),
+        },
+      ]);
+    } catch (error) {
+      console.error("Error clearing chat history:", error);
+      toast("Error", {
+        description: "Failed to clear chat history.",
+      });
+    }
+  };
+
+  // Helper to get code segments
+  const getCodeSegmentHelper = (
+    messageIndex: number,
+    sourceIndex: number,
+    segmentIndex = 0
+  ) => {
+    return getCodeSegment(messages, messageIndex, sourceIndex, segmentIndex);
+  };
+
+  // Main UI
+  if (!isInitialized) {
+    return (
+      <InitializationScreen
+        initializeRAG={initializeRAG}
+        isInitializing={isInitializing}
+      />
+    );
+  }
+
+  return (
+    <div className="w-full h-[calc(100vh-8rem)]">
+      <div className="flex flex-col h-full max-w-6xl mx-auto">
+        {/* User profile header with clear chat button */}
+        <div className="flex justify-between items-center">
+          <UserProfileHeader
+            userProfile={userProfile}
+            clerkUser={clerkUser}
+            isLoadingProfile={isLoadingProfile}
+          />
+
+          {messages.length > 1 && (
+            <Button
+              variant="outline"
+              onClick={clearChat}
+              disabled={isLoading}
+              className="mr-4"
+            >
+              Clear Chat
+            </Button>
+          )}
+        </div>
+
+        <div className="flex-1 w-full overflow-y-auto px-4 py-2">
+          <div className="space-y-8 pb-4">
+            {messages.length === 0 ? (
+              <EmptyChat />
+            ) : (
+              messages.map((message, index) => (
+                <ChatMessage
+                  key={`${message.id || index}-${index}`}
+                  message={message}
+                  index={index}
+                  userProfile={userProfile}
+                  clerkUser={clerkUser}
+                  getCodeSegment={getCodeSegmentHelper}
+                />
+              ))
+            )}
+            {isLoading && !messages.some((msg) => msg.isStreaming) && (
+              <div className="flex justify-center my-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        <MessageInput
+          input={input}
+          setInput={setInput}
+          handleSubmit={handleSubmit}
+          isLoading={isLoading}
+        />
+      </div>
+    </div>
+  );
+}
