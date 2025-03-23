@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Message, UserProfile } from "../types";
+import type { Message, UserProfile } from "../types";
+
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -187,7 +188,52 @@ export function ChatMessage({
     );
   }, [message.content, message.isStreaming, message.role]);
 
-  // Optimize initial animation
+  // Optimize initial animation and layout based on role
+  if (message.role === "assistant") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        layout="position"
+        className="flex flex-col items-start w-full"
+      >
+        <div className="flex items-center gap-2">
+          <Avatar className={cn("mt-1 sm:h-8 sm:w-8 md:h-10 md:w-10", "mr-2")}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-6 w-6"
+            >
+              <path d="M12 8V4H8" />
+              <rect width="16" height="12" x="4" y="8" rx="2" />
+              <path d="M2 14h2" />
+              <path d="M20 14h2" />
+              <path d="M15 13v2" />
+              <path d="M9 13v2" />
+            </svg>
+          </Avatar>
+          <span className="text-sm font-medium text-muted">AI said</span>
+        </div>
+        <div
+          className={cn(
+            "mt-2 p-2 sm:p-3 md:p-4 rounded-lg shadow-sm",
+            "bg-muted text-foreground w-full max-w-[90%] sm:max-w-[85%] md:max-w-[80%]"
+          )}
+        >
+          {MessageContent}
+          {sourcesSection}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // User message layout (side-by-side)
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -197,30 +243,9 @@ export function ChatMessage({
       className="flex items-start w-full"
     >
       <Avatar
-        className={cn(
-          "mt-1",
-          message.role === "user" ? "order-1 ml-3" : "mr-3"
-        )}
+        className={cn("mt-1 sm:h-8 sm:w-8 md:h-10 md:w-10", "order-1 ml-3")}
       >
-        {message.role === "assistant" ? (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-6 w-6"
-          >
-            <path d="M12 8V4H8" />
-            <rect width="16" height="12" x="4" y="8" rx="2" />
-            <path d="M2 14h2" />
-            <path d="M20 14h2" />
-            <path d="M15 13v2" />
-            <path d="M9 13v2" />
-          </svg>
-        ) : userProfile?.imageUrl || clerkUser?.imageUrl ? (
+        {userProfile?.imageUrl || clerkUser?.imageUrl ? (
           <Image
             src={userProfile?.imageUrl || clerkUser?.imageUrl || ""}
             alt="User"
@@ -246,11 +271,13 @@ export function ChatMessage({
       </Avatar>
       <div
         className={cn(
-          "p-4 rounded-lg shadow-sm",
-          message.role === "user"
-            ? "bg-primary text-primary-foreground ml-auto order-0 inline-block max-w-[85%]"
-            : "bg-muted text-foreground w-full max-w-[85%]"
+          "p-2 sm:p-3 md:p-4 rounded-lg shadow-sm",
+          "bg-primary-foreground text-primary-background ml-auto order-0 inline-block max-w-[90%] sm:max-w-[85%] md:max-w-[80%] dark:bg-primary dark:text-primary-foreground",
+          "w-full sm:w-fit" // Full width on mobile, fit-content on desktop
         )}
+        style={{
+          maxWidth: "100%" // Prevent overflow
+        }}
       >
         {MessageContent}
         {sourcesSection}
@@ -258,6 +285,3 @@ export function ChatMessage({
     </motion.div>
   );
 }
-
-// You can still memoize the component after defining it
-// export const MemoizedChatMessage = memo(ChatMessage);

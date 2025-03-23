@@ -30,7 +30,7 @@ const SidebarLayout = ({ children }: Props) => {
           </div>
         </header>
         <main className="w-full p-2">
-          <div className="no-scrollbar flex h-[calc(100svh-6rem)] gap-2 overflow-y-auto rounded-lg border border-sidebar-border bg-sidebar p-4 shadow">
+          <div className="no-scrollbar flex h-[calc(100svh-6rem)] gap-2 overflow-y-auto rounded-lg border border-sidebar-border bg-background p-4 shadow">
             {children}
           </div>
         </main>

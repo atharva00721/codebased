@@ -313,7 +313,12 @@ export default function ChatPage() {
     sourceIndex: number,
     segmentIndex = 0
   ) => {
-    const result = getCodeSegment(messages, messageIndex, sourceIndex, segmentIndex);
+    const result = getCodeSegment(
+      messages,
+      messageIndex,
+      sourceIndex,
+      segmentIndex
+    );
     return result === undefined ? "" : result;
   };
 
@@ -329,31 +334,11 @@ export default function ChatPage() {
 
   return (
     <div className="w-full h-[calc(100vh-8rem)]">
-      <div className="flex flex-col h-full max-w-6xl mx-auto">
-        {/* User profile header with clear chat button */}
-        <div className="flex justify-between items-center">
-          <UserProfileHeader
-            userProfile={userProfile}
-            clerkUser={clerkUser ? { ...clerkUser, firstName: clerkUser.firstName || undefined, lastName: clerkUser.lastName || undefined } : null}
-            isLoadingProfile={isLoadingProfile}
-          />
-
-          {messages.length > 1 && (
-            <Button
-              variant="outline"
-              onClick={clearChat}
-              disabled={isLoading}
-              className="mr-4"
-            >
-              Clear Chat
-            </Button>
-          )}
-        </div>
-
-        <div className="flex-1 w-full overflow-y-auto px-4 py-2">
-          <div className="space-y-8 pb-4">
+      <div className="flex flex-col h-full mx-auto">
+        <div className="flex-1 w-full overflow-y-auto px-4 sm:px-6 md:px-8 py-2">
+          <div className="space-y-8 h-full pb-4">
             {messages.length === 0 ? (
-              <EmptyChat />
+              <EmptyChat setInput={setInput} handleSubmit={handleSubmit} />
             ) : (
               messages.map((message, index) => (
                 <ChatMessage
@@ -380,6 +365,11 @@ export default function ChatPage() {
           setInput={setInput}
           handleSubmit={handleSubmit}
           isLoading={isLoading}
+          clearChat={clearChat}
+          showClearChat={messages.length > 1}
+          userProfile={userProfile}
+          clerkUser={clerkUser}
+          isLoadingProfile={isLoadingProfile}
         />
       </div>
     </div>
