@@ -230,7 +230,9 @@ async function processFileContent(
       },
     });
 
-    const content = typeof response.data === "string" ? response.data : "";
+    // More explicit typing to ensure TypeScript recognizes content as a string
+    const content: string =
+      typeof response.data === "string" ? response.data : "";
     if (!content) return;
 
     // Analyze the file content to extract metadata
@@ -602,7 +604,7 @@ export const gitCommitProcessor = async (
       owner,
       repo,
       per_page: 15,
-    });
+    });s
 
     const processedCommits = await Promise.all(
       data.map(async (commit: GitHubCommit, index: number) => {
