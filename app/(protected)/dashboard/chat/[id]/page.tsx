@@ -6,11 +6,13 @@ import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { Message, UserProfile } from "./types";
 import { getCodeSegment } from "./utils";
-import { InitializationScreen } from "./_components/InitializationScreen";
+import { getUserProfile } from "@/app/actions/user";
+
 import { EmptyChat } from "./_components/EmptyChat";
 import { ChatMessage } from "./_components/ChatMessage";
 import { MessageInput } from "./_components/MessageInput";
 import useProject from "@/hooks/useProject";
+import { InitializationScreen } from "./_components/InitializationScreen";
 
 export default function ChatPage() {
   // Fix property name from isLoading to loading
@@ -38,11 +40,7 @@ export default function ChatPage() {
 
       setIsLoadingProfile(true);
       try {
-        const response = await fetch("/api/user/profile");
-        if (!response.ok) {
-          throw new Error("Failed to fetch user profile");
-        }
-        const userData = await response.json();
+        const userData = await getUserProfile();
         setUserProfile(userData);
       } catch (error) {
         console.error("Error fetching user profile:", error);
@@ -122,12 +120,10 @@ export default function ChatPage() {
       const result = await response.json();
 
       if (result.success) {
+        setIsInitialized(true);
         toast("Repository initialized", {
           description: `${result.newEmbeddings} new embeddings created.`,
         });
-        setIsInitialized(true);
-
-        // Add assistant welcome message
         setMessages([
           {
             role: "assistant",
@@ -347,7 +343,7 @@ export default function ChatPage() {
     );
   }
 
-  // Main UI
+  // Main rendering logic
   if (!isInitialized) {
     return (
       <InitializationScreen

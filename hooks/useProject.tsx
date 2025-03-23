@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { getProjects } from "@/app/actions/projects";
 
 interface Project {
   id: string;
   name: string;
   githubUrl: string;
-  createdAt: string;
-  userId: string;
-  user: {
-    name: string;
-  };
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  deleteAt: string | Date | null;
 }
 
 const useProject = () => {
@@ -25,13 +24,7 @@ const useProject = () => {
     const fetchProjects = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/projects");
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await getProjects();
         console.log("Fetched projects:", data);
         setProjects(data);
 

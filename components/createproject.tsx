@@ -18,6 +18,7 @@ import {
 import { FormItem, FormControl, FormMessage, Form, FormField } from "./ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { createProject } from "@/app/actions/projects";
 
 const formSchema = z.object({
   repoUrl: z.string().min(1, "Repository URL is required"),
@@ -44,42 +45,19 @@ const CreateProject = () => {
     setFormError(null);
     try {
       setIsSubmitting(true);
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.projectName,
-          githubUrl: data.repoUrl,
-          githubToken: data.githubToken,
-        }),
+      await createProject({
+        name: data.projectName,
+        githubUrl: data.repoUrl,
+        githubToken: data.githubToken || "",
       });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 409) {
-          setFormError(
-            responseData.error ||
-              "A project with the same name or URL already exists"
-          );
-          throw new Error(
-            responseData.error ||
-              "A project with the same name or URL already exists"
-          );
-        } else {
-          throw new Error(responseData.error || "Failed to create project");
-        }
-      }
 
       toast.success("Project created successfully");
       form.reset();
     } catch (error) {
       console.error("Error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create project"
-      );
+      const errorMessage = error instanceof Error ? error.message : "Failed to create project";
+      setFormError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
