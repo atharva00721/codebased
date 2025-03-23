@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Send, Trash2 } from "lucide-react";
@@ -11,7 +11,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserProfile } from "../types";
 
-// Update the type to be more generic to work with different Clerk user types
+// Define a more specific type for Clerk user
+interface ClerkUserType {
+  firstName?: string;
+  lastName?: string;
+  imageUrl?: string;
+  emailAddresses?: Array<{ emailAddress: string }>;
+}
+
 interface MessageInputProps {
   input: string;
   setInput: (value: string) => void;
@@ -20,25 +27,8 @@ interface MessageInputProps {
   clearChat?: () => Promise<void>;
   showClearChat?: boolean;
   userProfile?: UserProfile | null;
-  // Change type to be more permissive - any Clerk user object
-  clerkUser?: any | null;
+  clerkUser?: ClerkUserType | null;
   isLoadingProfile?: boolean;
-}
-
-// Function to fetch user profile including credits
-async function fetchUserProfile(): Promise<{ credits: number } | null> {
-  try {
-    // Use the existing profile API route
-    const response = await fetch("/api/user/profile");
-    if (!response.ok) {
-      throw new Error("Failed to fetch user profile");
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error fetching user profile:", error);
-    return null;
-  }
 }
 
 export function MessageInput({
@@ -52,9 +42,7 @@ export function MessageInput({
   clerkUser,
   isLoadingProfile = false,
 }: MessageInputProps) {
-  // State for user credits
-  // const [credits, setCredits] = useState<number | null>(null);
-  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
+  // State for user credits - removed unused loading state
 
   // Get initials from user profile or clerk user
   const getInitials = () => {
@@ -74,12 +62,6 @@ export function MessageInput({
   const imageUrl = userProfile?.imageUrl || clerkUser?.imageUrl;
   const name = userProfile?.firstName || clerkUser?.firstName || "User";
   const credits = userProfile?.credits;
-  // Safely access email address
-  const emailAddress =
-    userProfile?.emailAddress ||
-    (clerkUser?.emailAddresses && clerkUser.emailAddresses.length > 0
-      ? clerkUser.emailAddresses[0].emailAddress
-      : "");
 
   return (
     <div className="border-t mt-4 pt-4">
@@ -114,13 +96,8 @@ export function MessageInput({
         <div className="flex items-center gap-2">
           <div className="text-right">
             <p className="text-sm font-medium">{name}</p>
-            {/* <p className="text-xs text-muted-foreground">{emailAddress}</p> */}
             <p className="text-xs text-green-500 font-medium">
-              {isLoadingCredits
-                ? "Loading credits..."
-                : credits !== null
-                ? `Credits: ${credits}`
-                : "Credits: -"}
+              {credits !== null ? `Credits: ${credits}` : "Credits: -"}
             </p>
           </div>
           <Avatar className="h-8 w-8">

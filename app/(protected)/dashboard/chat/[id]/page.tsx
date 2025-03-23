@@ -6,12 +6,10 @@ import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { Message, UserProfile } from "./types";
 import { getCodeSegment } from "./utils";
-import { UserProfileHeader } from "./_components/UserProfileHeader";
 import { InitializationScreen } from "./_components/InitializationScreen";
 import { EmptyChat } from "./_components/EmptyChat";
 import { ChatMessage } from "./_components/ChatMessage";
 import { MessageInput } from "./_components/MessageInput";
-import { Button } from "@/components/ui/button";
 import useProject from "@/hooks/useProject";
 
 export default function ChatPage() {
@@ -368,7 +366,6 @@ export default function ChatPage() {
           clearChat={clearChat}
           showClearChat={messages.length > 1}
           userProfile={userProfile}
-          clerkUser={clerkUser}
           isLoadingProfile={isLoadingProfile}
         />
       </div>
