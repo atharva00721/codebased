@@ -15,18 +15,40 @@ import {
   AetherTitle,
   AetherTrigger,
 } from "./responsive-modal";
+import {
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  Form,
+  FormField,
+} from "./ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
-type FormInput = {
-  repoUrl: string;
-  projectName: string;
-  githubToken?: string;
-};
+const formSchema = z.object({
+  repoUrl: z.string().min(1, "Repository URL is required"),
+  projectName: z.string().min(1, "Project name is required"),
+  githubToken: z.string().optional(),
+});
+
+type FormInput = z.infer<typeof formSchema>;
 
 const CreateProject = () => {
-  const { register, handleSubmit, reset } = useForm<FormInput>();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [formError, setFormError] = React.useState<string | null>(null);
+
+  const form = useForm<FormInput>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      repoUrl: "",
+      projectName: "",
+      githubToken: "",
+    },
+  });
 
   const onSubmit = async (data: FormInput) => {
+    setFormError(null);
     try {
       setIsSubmitting(true);
       const response = await fetch("/api/projects", {
@@ -41,16 +63,30 @@ const CreateProject = () => {
         }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create project");
+        if (response.status === 409) {
+          setFormError(
+            responseData.error ||
+              "A project with the same name or URL already exists"
+          );
+          throw new Error(
+            responseData.error ||
+              "A project with the same name or URL already exists"
+          );
+        } else {
+          throw new Error(responseData.error || "Failed to create project");
+        }
       }
 
       toast.success("Project created successfully");
-      reset();
+      form.reset();
     } catch (error) {
       console.error("Error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create project");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create project"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -85,32 +121,79 @@ const CreateProject = () => {
             alt="Create Project"
             className="rounded-lg hidden md:block"
           />
-          <div>
+          <div className="w-full">
             <div className="h-4" />
             <div className="">
-              <form
-                onSubmit={handleSubmit(onSubmit)}
-                className="flex w-full flex-col gap-y-2"
-              >
-                <Input
-                  {...register("repoUrl", { required: true })}
-                  placeholder="Repository URL"
-                  required
-                />
-                <Input
-                  {...register("projectName", { required: true })}
-                  placeholder="Project Name"
-                  required
-                />
-                <Input
-                  {...register("githubToken")}
-                  placeholder="Github Token"
-                />
-                <Button type="submit" disabled={isSubmitting} className="dark:text-black text-white">
-                  {isSubmitting ? "Creating..." : "Create Project"}
-                </Button>
-              </form>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="flex w-full flex-col gap-y-4"
+                >
+                  {formError && (
+                    <div className="bg-destructive/10 text-destructive px-3 py-2 rounded-md text-sm mb-2">
+                      {formError}
+                    </div>
+                  )}
 
+                  <FormField
+                    control={form.control}
+                    name="repoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Repository URL"
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="projectName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Project Name"
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="githubToken"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Github Token (optional)"
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="dark:text-black text-white"
+                  >
+                    {isSubmitting ? "Creating..." : "Create Project"}
+                  </Button>
+                </form>
+              </Form>
             </div>
           </div>
         </div>

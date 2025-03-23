@@ -14,11 +14,11 @@ type Props = {
 
 const SidebarLayout = ({ children }: Props) => {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="bg-black">
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-20 shrink-0 items-center p-2">
-          <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-sidebar p-2 px-4 shadow">
+      <SidebarInset className="flex flex-col gap-0">
+        <header className="flex h-20 shrink-0 items-start">
+          <div className="flex w-full items-center  justify-between gap-2 bg-sidebar p-2 px-4">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="hover:glassmorphism2 -ml-1" />
               <Separator orientation="vertical" className="mr-2 h-4" />
@@ -29,8 +29,8 @@ const SidebarLayout = ({ children }: Props) => {
             </div>
           </div>
         </header>
-        <main className="w-full p-2">
-          <div className="no-scrollbar flex h-[calc(100svh-6rem)] gap-2 overflow-y-auto rounded-lg border border-sidebar-border bg-background p-4 shadow">
+        <main className="w-full p-3 sm:p-2">
+          <div className="no-scrollbar flex h-[calc(100svh-5rem)] gap-2 overflow-y-auto border border-card-muted rounded-lg -mt-6 p-4">
             {children}
           </div>
         </main>

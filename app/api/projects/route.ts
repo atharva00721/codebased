@@ -61,6 +61,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if project with same name or URL already exists for this user
+    const existingProject = await db.project.findFirst({
+      where: {
+        OR: [
+          { name, userToProjects: { some: { userId } } },
+          { githubUrl, userToProjects: { some: { userId } } },
+        ],
+      },
+    });
+
+    if (existingProject) {
+      return NextResponse.json(
+        { error: "A project with the same name or URL already exists" },
+        { status: 409 }
+      );
+    }
+
     // Create the project
     const project = await db.project.create({
       data: {
