@@ -13,10 +13,9 @@ import { MessageInput } from "./_components/MessageInput";
 import useProject from "@/hooks/useProject";
 
 export default function ChatPage() {
-  // Fix the typing for useParams
-  // const params = useParams();
-  // const projectId = params!.id as string;
-  const { projectId } = useProject();
+  // Fix property name from isLoading to loading
+  const { projectId, loading: isProjectLoading } = useProject();
+
   // Get current user from Clerk
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
 
@@ -80,6 +79,8 @@ export default function ChatPage() {
   // Check if RAG is initialized for this project
   useEffect(() => {
     const checkInitialization = async () => {
+      if (!projectId) return; // Don't make API calls if no projectId
+
       try {
         // Add API call to check if repository is initialized
         const response = await fetch("/api/rag/status", {
@@ -92,17 +93,20 @@ export default function ChatPage() {
         setIsInitialized(data.initialized);
       } catch (error) {
         console.error("Failed to check initialization status:", error);
+        toast("Error", {
+          description: "Failed to check project initialization status.",
+        });
       }
     };
 
-    if (projectId) {
+    if (projectId && !isProjectLoading) {
       checkInitialization();
     }
-  }, [projectId]);
+  }, [projectId, isProjectLoading]);
 
   // Initialize RAG for the project
   const initializeRAG = async () => {
-    if (isInitializing) return;
+    if (isInitializing || !projectId) return;
 
     setIsInitializing(true);
     try {
@@ -151,7 +155,7 @@ export default function ChatPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !projectId) return;
 
     // Add user message
     const userMessage: Message = {
@@ -277,7 +281,7 @@ export default function ChatPage() {
 
   // Add a function to clear chat history
   const clearChat = async () => {
-    if (isLoading) return;
+    if (isLoading || !projectId) return;
 
     setMessages([]);
 
@@ -319,6 +323,29 @@ export default function ChatPage() {
     );
     return result === undefined ? "" : result;
   };
+
+  // Show loading state while project is loading
+  if (isProjectLoading) {
+    return (
+      <div className="w-full h-[calc(100vh-8rem)] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading project...</span>
+      </div>
+    );
+  }
+
+  // Show error if no project is found
+  if (!projectId && !isProjectLoading) {
+    return (
+      <div className="w-full h-[calc(100vh-8rem)] flex items-center justify-center flex-col">
+        <div className="text-xl font-medium mb-2">Project Not Found</div>
+        <p className="text-muted-foreground">
+          Could not find the requested project. Please check the URL and try
+          again.
+        </p>
+      </div>
+    );
+  }
 
   // Main UI
   if (!isInitialized) {
