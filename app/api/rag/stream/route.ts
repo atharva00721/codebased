@@ -7,7 +7,7 @@ export const maxDuration = 60; // Set max duration to 60 seconds
 
 export async function POST(req: NextRequest) {
   try {
-    const { projectId, query, messageHistory = [] } = await req.json();
+    const { projectId, query } = await req.json();
 
     if (!projectId || !query) {
       return NextResponse.json(
