@@ -5,7 +5,6 @@ import * as React from "react";
 // import useProject from "~/hooks/useProject";
 
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
@@ -19,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import useProject from "@/hooks/useProject";
 
 const DashboardPage = () => {
-  const { project, projectId, setProjectId } = useProject();
+  const { project } = useProject();
 
   return (
     <div className="flex w-full flex-col gap-y-4 p-1 no-scrollbar">

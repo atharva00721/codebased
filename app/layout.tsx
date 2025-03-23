@@ -26,7 +26,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable}`}>
+      <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
         <body vaul-drawer-wrapper="">
           <ThemeProvider
             attribute="class"

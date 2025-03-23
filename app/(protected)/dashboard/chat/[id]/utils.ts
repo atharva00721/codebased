@@ -58,9 +58,9 @@ export const getCodeSegment = (
 
     if (!segment.segment) {
       // Try alternative property names that might contain the code
-      if ((segment as any).code) return (segment as any).code;
-      if ((segment as any).content) return (segment as any).content;
-      if ((segment as any).text) return (segment as any).text;
+      if ("code" in segment) return segment.code;
+      if ("content" in segment) return segment.content;
+      if ("text" in segment) return segment.text;
 
       return "Code segment exists but content is empty";
     }

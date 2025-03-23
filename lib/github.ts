@@ -1,7 +1,8 @@
 import { Octokit } from "@octokit/rest";
 import { db } from "@/server/db";
 import { AISummarizeCommits, generateEmbedding } from "./gemini";
-import { analyzeCodeFile, generateCodeSummary } from "./codeAnalyzer";
+// Remove or comment out unused imports
+// import { analyzeCodeFile, generateCodeSummary } from "./codeAnalyzer";
 
 // Types
 type CommitResponse = {
@@ -12,6 +13,56 @@ type CommitResponse = {
   commitAuthorAvatar: string;
   commitDate: Date;
   summary: string;
+};
+
+// Define types for GitHub API responses
+type GitHubCommit = {
+  sha: string;
+  commit: {
+    message: string;
+    author?: {
+      name?: string;
+      date?: string;
+    } | null;
+  };
+  author?: {
+    avatar_url?: string;
+    login?: string;
+    id?: number;
+    node_id?: string;
+    gravatar_id?: string | null;
+    url?: string;
+    html_url?: string;
+  } | null;
+};
+
+type GitHubWebhookCommit = {
+  id: string;
+  message: string;
+  author: {
+    name: string;
+    avatar_url?: string;
+  };
+  timestamp: string;
+};
+
+type GitHubWebhookPayload = {
+  repository: {
+    owner: {
+      name: string;
+    };
+    name: string;
+  };
+  commits: GitHubWebhookCommit[];
+  project_id: string;
+};
+
+type SourceCodeEmbeddingItem = {
+  id: string;
+  fileName: string;
+  sourceCode?: string;
+  summary: string;
+  similarity: number | string;
 };
 
 // Utility functions
@@ -102,7 +153,7 @@ export const processRepositoryForRAG = async (
   projectId: string,
   token?: string
 ) => {
-  const octokit = createOctokit(token);
+  // const octokit = createOctokit(token);
   try {
     const [owner, repo] = githubUrl.split("/").slice(-2);
 
@@ -161,7 +212,7 @@ function shouldProcessFile(path: string) {
 
 // Process file content and store its embedding
 async function processFileContent(
-  file: any,
+  file: { path: string; type: string; [key: string]: unknown }, // Changed any to unknown for better type safety
   owner: string,
   repo: string,
   projectId: string,
@@ -187,10 +238,9 @@ async function processFileContent(
 
     // Check if codeAnalyzer module is imported/available
     try {
-      const {
-        analyzeCodeFile,
-        generateCodeSummary,
-      } = require("./codeAnalyzer");
+      // Use dynamic import instead of require()
+      const codeAnalyzer = await import("./codeAnalyzer");
+      const { analyzeCodeFile, generateCodeSummary } = codeAnalyzer;
       const metadata = analyzeCodeFile(content, file.path);
       summary = generateCodeSummary(content, metadata, file.path);
       console.log(
@@ -295,7 +345,7 @@ function extractCodeStructure(content: string, filePath: string): string {
     const extension = filePath
       .substring(filePath.lastIndexOf("."))
       .toLowerCase();
-    let structure = [];
+    const structure = []; // Changed from let to const as it's never reassigned
 
     // Extract function and class names based on file type
     if ([".ts", ".tsx", ".js", ".jsx"].includes(extension)) {
@@ -353,13 +403,41 @@ function extractCodeStructure(content: string, filePath: string): string {
           });
       }
     } else if ([".py"].includes(extension)) {
-      // Python patterns
-      const functionMatches = content.match(/def\s+(\w+)\s*\([^)]*\)/g) || [];
-      const classMatches = content.match(/class\s+(\w+)/g) || [];
-      const importMatches = content.match(/(?:import|from)\s+(\S+)/g) || [];
+      // Python patterns - implement similar to JS/TS patterns to use these variables
+      const pythonFunctionMatches =
+        content.match(/def\s+(\w+)\s*\([^)]*\)/g) || [];
+      const pythonClassMatches = content.match(/class\s+(\w+)/g) || [];
+      const pythonImportMatches =
+        content.match(/(?:import|from)\s+(\S+)/g) || [];
 
-      // Similar processing for Python files...
-      // ...
+      // Add Python functions
+      if (pythonFunctionMatches.length) {
+        structure.push("Functions:");
+        pythonFunctionMatches.slice(0, 5).forEach((match) => {
+          const name = match.match(/def\s+(\w+)/) || [];
+          if (name[1]) structure.push(`- ${name[1]}`);
+        });
+      }
+
+      // Add Python classes
+      if (pythonClassMatches.length) {
+        structure.push("Classes:");
+        pythonClassMatches.slice(0, 3).forEach((match) => {
+          const name = match.match(/class\s+(\w+)/) || [];
+          if (name[1]) structure.push(`- ${name[1]}`);
+        });
+      }
+
+      // Add Python imports
+      if (pythonImportMatches.length) {
+        structure.push("Dependencies:");
+        pythonImportMatches.slice(0, 5).forEach((match) => {
+          const importName = match
+            .replace(/^(import|from)\s+/, "")
+            .split(/\s+/)[0];
+          structure.push(`- ${importName}`);
+        });
+      }
     }
 
     // If no structure was detected
@@ -420,7 +498,7 @@ export const searchSimilarCode = async (
     const enhancedResults =
       processedResults.length > 0
         ? await Promise.all(
-            processedResults.map(async (item: any) => {
+            processedResults.map(async (item: SourceCodeEmbeddingItem) => {
               // Find the most relevant parts of the source code
               const relevantSegments = findRelevantCodeSegments(
                 item.sourceCode || "",
@@ -527,7 +605,7 @@ export const gitCommitProcessor = async (
     });
 
     const processedCommits = await Promise.all(
-      data.map(async (commit: any, index: number) => {
+      data.map(async (commit: GitHubCommit, index: number) => {
         // Add delay between API calls
         await delay(index * RATE_LIMIT_DELAY);
 
@@ -621,7 +699,8 @@ export const pullCommits = async (projectId: string, token?: string) => {
     const savedCommits = [];
     for (let i = 0; i < newCommits.length; i += BATCH_SIZE) {
       const batch = newCommits.slice(i, i + BATCH_SIZE);
-      const result = await db.commit.createMany({
+      // Use the result or remove the assignment
+      await db.commit.createMany({
         data: batch.map((commit) => ({
           projectId: commit.projectId,
           commitHash: commit.commitHash,
@@ -644,7 +723,7 @@ export const pullCommits = async (projectId: string, token?: string) => {
 };
 
 // Optional: Webhook handler for real-time updates
-export const handleGitHubWebhook = async (payload: any) => {
+export const handleGitHubWebhook = async (payload: GitHubWebhookPayload) => {
   try {
     const { repository, commits, project_id } = payload;
 
@@ -653,7 +732,7 @@ export const handleGitHubWebhook = async (payload: any) => {
     }
 
     const processedWebhookCommits = await Promise.all(
-      commits.map(async (commit: any) => {
+      commits.map(async (commit: GitHubWebhookCommit) => {
         const diff = await fetchCommitDiff(
           repository.owner.name,
           repository.name,

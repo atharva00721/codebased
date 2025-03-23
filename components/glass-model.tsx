@@ -25,8 +25,6 @@ export const GlassModal = ({
   title,
   description,
   className,
-  isOpen,
-  onClose,
 }: GlassModalProps) => {
   return (
     <Aether>

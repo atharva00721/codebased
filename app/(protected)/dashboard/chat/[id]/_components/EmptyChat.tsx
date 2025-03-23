@@ -22,8 +22,8 @@ export function EmptyChat() {
       </div>
       <h2 className="text-3xl font-bold mb-4">Code Assistant</h2>
       <p className="text-muted-foreground text-lg max-w-lg">
-        Ask questions about this codebase, and I'll help you understand how it
-        works.
+        Ask questions about this codebase, and I&apos;ll help you understand how
+        it works.
       </p>
     </div>
   );

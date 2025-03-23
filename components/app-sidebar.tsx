@@ -1,12 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Bot,
-  CreditCardIcon,
-  LayoutDashboardIcon,
-  PresentationIcon,
-} from "lucide-react";
+import { Bot, LayoutDashboardIcon } from "lucide-react";
 import { NavMain } from "@/components/nav-main";
 
 import {

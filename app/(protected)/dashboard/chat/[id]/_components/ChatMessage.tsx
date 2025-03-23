@@ -15,7 +15,9 @@ interface ChatMessageProps {
   message: Message;
   index: number;
   userProfile: UserProfile | null;
-  clerkUser: any;
+  clerkUser: {
+    imageUrl?: string | null;
+  } | null;
   getCodeSegment: (
     messageIndex: number,
     sourceIndex: number,
@@ -125,7 +127,7 @@ export function ChatMessage({
       <div className="prose prose-lg dark:prose-invert max-w-none">
         <ReactMarkdown
           components={{
-            code: ({ node, className, children, ...props }) => {
+            code: ({ className, children, ...props }) => {
               const match = /language-(\w+)/.exec(className || "");
               return match ? (
                 <CodeBlock

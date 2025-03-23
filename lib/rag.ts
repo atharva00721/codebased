@@ -1,5 +1,4 @@
 import { db } from "@/server/db";
-import { generateEmbedding } from "./gemini";
 import { searchSimilarCode } from "./github";
 
 /**
@@ -85,12 +84,11 @@ export async function queryRepositoryRAG(projectId: string, query: string) {
   }
 }
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 async function generateAnswerFromContext(query: string, context: string) {
   // Use existing Gemini instance from gemini.ts
-  const { GoogleGenerativeAI } = require("@google/generative-ai");
-  const genAI = new GoogleGenerativeAI(
-    process.env.GEMINI_API_KEY || "AIzaSyCHGqbXMZWMHYZc9AuSdaaJY09VJqna2Zw"
-  );
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   try {

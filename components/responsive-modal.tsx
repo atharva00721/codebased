@@ -1,12 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/isdesk";
 import {

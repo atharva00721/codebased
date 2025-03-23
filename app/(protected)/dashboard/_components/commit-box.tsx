@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import useProject from "@/hooks/useProject";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,

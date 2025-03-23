@@ -4,7 +4,6 @@ import { searchSimilarCode } from "@/lib/github";
 import { streamGeminiResponse } from "@/lib/gemini";
 
 export const maxDuration = 60; // Set max duration to 60 seconds
-const BATCH_SIZE = 1024; // Optimal batch size for text streaming
 
 export async function POST(req: NextRequest) {
   try {

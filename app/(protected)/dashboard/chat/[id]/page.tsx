@@ -13,12 +13,13 @@ import { EmptyChat } from "./_components/EmptyChat";
 import { ChatMessage } from "./_components/ChatMessage";
 import { MessageInput } from "./_components/MessageInput";
 import { Button } from "@/components/ui/button";
+import useProject from "@/hooks/useProject";
 
 export default function ChatPage() {
   // Fix the typing for useParams
-  const params = useParams();
-  const projectId = params?.id as string;
-
+  // const params = useParams();
+  // const projectId = params!.id as string;
+  const { projectId } = useProject();
   // Get current user from Clerk
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
 
@@ -313,7 +314,8 @@ export default function ChatPage() {
     sourceIndex: number,
     segmentIndex = 0
   ) => {
-    return getCodeSegment(messages, messageIndex, sourceIndex, segmentIndex);
+    const result = getCodeSegment(messages, messageIndex, sourceIndex, segmentIndex);
+    return result === undefined ? "" : result;
   };
 
   // Main UI
@@ -333,7 +335,7 @@ export default function ChatPage() {
         <div className="flex justify-between items-center">
           <UserProfileHeader
             userProfile={userProfile}
-            clerkUser={clerkUser}
+            clerkUser={clerkUser ? { ...clerkUser, firstName: clerkUser.firstName || undefined, lastName: clerkUser.lastName || undefined } : null}
             isLoadingProfile={isLoadingProfile}
           />
 
@@ -360,7 +362,7 @@ export default function ChatPage() {
                   message={message}
                   index={index}
                   userProfile={userProfile}
-                  clerkUser={clerkUser}
+                  clerkUser={clerkUser || null}
                   getCodeSegment={getCodeSegmentHelper}
                 />
               ))

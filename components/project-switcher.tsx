@@ -13,7 +13,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -24,14 +23,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import useProject from "@/hooks/useProject";
-import { cn } from "@/lib/utils";
-import CreateProject from "./createproject";
 
 export function ProjectSwitcher() {
   const { isMobile } = useSidebar();
 
-  const { projects, projectId, setProjectId, project } = useProject();
-  const [activeTeam, setActiveTeam] = React.useState(projects[0]);
+  const { projects, setProjectId, project } = useProject();
 
   const handleProjectChange = (id: string) => {
     console.log("Switching to project:", id);

@@ -91,7 +91,7 @@ const ThreadWelcomeSuggestions: FC = () => {
         autoSend
       >
         <span className="line-clamp-2 text-ellipsis text-sm font-semibold">
-          What's the Project About?
+          What&apos;s the Project About?
         </span>
       </ThreadPrimitive.Suggestion>
       <ThreadPrimitive.Suggestion

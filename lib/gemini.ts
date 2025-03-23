@@ -11,7 +11,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 // Store chat sessions by project ID with LRU mechanism to prevent memory leaks
 const MAX_CHAT_SESSIONS = 100;
 class LRUChatSessions {
-  private sessions: Map<string, any>;
+  private sessions: Map<string, ReturnType<typeof model.startChat>>;
   private maxSize: number;
 
   constructor(maxSize = MAX_CHAT_SESSIONS) {
@@ -24,13 +24,15 @@ class LRUChatSessions {
 
     // Access makes this entry the most recently used
     const value = this.sessions.get(key);
-    this.sessions.delete(key);
-    this.sessions.set(key, value);
+    if (value) {
+      this.sessions.delete(key);
+      this.sessions.set(key, value);
+    }
 
     return value;
   }
 
-  set(key: string, value: any) {
+  set(key: string, value: ReturnType<typeof model.startChat>) {
     // If key exists, refresh it
     if (this.sessions.has(key)) {
       this.sessions.delete(key);
@@ -181,14 +183,14 @@ export async function generateEmbedding(summary: string): Promise<number[]> {
  * @param query The user's query
  * @param contextDocuments Array of relevant context documents
  * @param projectId Project ID to maintain conversation context
- * @param messageHistory Previous conversation history
  * @returns A ReadableStream for streaming the response
  */
 export async function streamGeminiResponse(
   query: string,
-  contextDocuments: any[],
+  contextDocuments: { fileName: string; sourceCode: string }[],
   projectId: string,
-  messageHistory: { role: string; content: string }[] = []
+  // Not using messageHistory but keeping parameter for API compatibility
+  _messageHistory: { role: string; content: string }[] = []
 ) {
   try {
     // Format context documents into a prompt
@@ -207,7 +209,7 @@ export async function streamGeminiResponse(
     // Check if we have an existing chat session for this project
     if (!chatSessions.has(projectId)) {
       // Initialize a new chat session
-      const systemPrompt = `You are an AI programming assistant that helps developers understand their codebase.
+      const systemPromptContent = `You are an AI programming assistant that helps developers understand their codebase.
 Answer questions based on the provided code context. 
 If you don't know the answer or the context doesn't contain relevant information, say so.
 Keep your responses concise and focused on the code.`;
@@ -245,6 +247,10 @@ Keep your responses concise and focused on the code.`;
       : `My question is about the codebase: ${query}`;
 
     // Send message to chat and get streaming response
+    if (!chat) {
+      throw new Error("Failed to initialize or retrieve chat session");
+    }
+
     const response = await chat.sendMessageStream(contextualQuery);
 
     return response;

@@ -7,7 +7,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
@@ -23,7 +22,6 @@ const sampleProjects = [
 ];
 
 export function NavProjects() {
-  const { isMobile } = useSidebar();
   // Replace dynamic state with static data and local state
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
     null

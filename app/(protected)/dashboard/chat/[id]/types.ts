@@ -7,6 +7,16 @@ export interface UserProfile {
   credits: number;
 }
 
+export interface ClerkUser {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  imageUrl?: string;
+  emailAddresses?: Array<{
+    emailAddress: string;
+  }>;
+}
+
 export interface Source {
   fileName: string;
   similarity: number;
@@ -14,6 +24,9 @@ export interface Source {
     lineStart: number;
     lineEnd: number;
     segment: string;
+    code?: string;
+    content?: string;
+    text?: string;
   }[];
   sourceCode?: string;
 }
