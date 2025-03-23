@@ -190,7 +190,7 @@ export async function streamGeminiResponse(
   contextDocuments: { fileName: string; sourceCode: string }[],
   projectId: string,
   // Not using messageHistory but keeping parameter for API compatibility
-  _messageHistory: { role: string; content: string }[] = []
+  // _messageHistory: { role: string; content: string }[] = []
 ) {
   try {
     // Format context documents into a prompt
@@ -209,16 +209,16 @@ export async function streamGeminiResponse(
     // Check if we have an existing chat session for this project
     if (!chatSessions.has(projectId)) {
       // Initialize a new chat session
-      const systemPromptContent = `You are an AI programming assistant that helps developers understand their codebase.
-Answer questions based on the provided code context. 
-If you don't know the answer or the context doesn't contain relevant information, say so.
-Keep your responses concise and focused on the code.`;
+//       const systemPromptContent = `You are an AI programming assistant that helps developers understand their codebase.
+// Answer questions based on the provided code context. 
+// If you don't know the answer or the context doesn't contain relevant information, say so.
+// Keep your responses concise and focused on the code.`;
 
       chat = model.startChat({
         history: [
           {
             role: "user",
-            parts: [{ text: "Hello, I need help understanding my codebase." }],
+            parts: [{ text: "Hello, I need help understanding my codebase and the project as a whole." }],
           },
           {
             role: "model",

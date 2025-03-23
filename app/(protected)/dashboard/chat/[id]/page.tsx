@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";

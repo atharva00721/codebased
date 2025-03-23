@@ -2,7 +2,7 @@
 
 import { type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { Collapsible } from "@/components/ui/collapsible";
 import {

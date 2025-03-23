@@ -43,7 +43,6 @@ const desktop = "(min-width: 768px)";
 
 const Aether = ({
   children,
-  tooltip,
   ...props
 }: RootAetherProps & {
   tooltip?: string | React.ComponentProps<typeof TooltipContent>;

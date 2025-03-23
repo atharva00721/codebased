@@ -9,7 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
+  
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";

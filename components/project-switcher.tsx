@@ -1,12 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  ChevronsUpDown,
-  Plus,
-  SquareActivity,
-  SquareTerminal,
-} from "lucide-react";
+import { ChevronsUpDown, SquareActivity, SquareTerminal } from "lucide-react";
 
 import {
   DropdownMenu,
