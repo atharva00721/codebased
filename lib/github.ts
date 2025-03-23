@@ -514,7 +514,7 @@ export const searchSimilarCode = async (
           )
         : [];
 
-    return enhancedResults || [];
+    return enhancedResults;
   } catch (error) {
     console.error("Error searching similar code:", error);
     return [];
@@ -604,7 +604,7 @@ export const gitCommitProcessor = async (
       owner,
       repo,
       per_page: 15,
-    });s
+    });
 
     const processedCommits = await Promise.all(
       data.map(async (commit: GitHubCommit, index: number) => {
