@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
       formattedSources,
       projectId
     );
-    messageHistory;
 
     // Set up an optimized streaming response
     const encoder = new TextEncoder();
