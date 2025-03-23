@@ -29,13 +29,19 @@ export async function POST(req: NextRequest) {
     // Find relevant source code using embeddings (limit to 3 for better performance)
     const relevantSources = await searchSimilarCode(projectId, query, 3);
 
+    // Map to the expected format for streamGeminiResponse
+    const formattedSources = relevantSources.map((source) => ({
+      fileName: source.fileName,
+      sourceCode: source.sourceCode || "", // Ensure sourceCode is always a string
+    }));
+
     // Create a stream from Gemini with chat history
     const responseStream = await streamGeminiResponse(
       query,
-      relevantSources,
-      projectId,
-      messageHistory
+      formattedSources,
+      projectId
     );
+    messageHistory;
 
     // Set up an optimized streaming response
     const encoder = new TextEncoder();
