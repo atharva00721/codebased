@@ -1,5 +1,5 @@
 "use client";
-import { FileText, ExternalLink, Github, MessageSquare } from "lucide-react";
+import { FileText, ExternalLink, Github as GitHubIcon, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -197,7 +197,7 @@ export default function Home() {
                         Example Query:
                       </div>
                       <div className="text-gray-600 dark:text-gray-300 mb-2">
-                        "{example.query}"
+                        &quot;{example.query}&quot;
                       </div>
                       <div className="text-gray-500 dark:text-gray-400 italic">
                         {example.response}
@@ -225,7 +225,7 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Github className="mr-2" size={16} />
+            <GitHubIcon className="mr-2" size={16} />
             View on GitHub
           </a>
         </div>
