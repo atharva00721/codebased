@@ -41,6 +41,9 @@ export default function ChatPage() {
       setIsLoadingProfile(true);
       try {
         const userData = await getUserProfile();
+        if (!userData) {
+          throw new Error("No user data returned");
+        }
         setUserProfile(userData);
       } catch (error) {
         console.error("Error fetching user profile:", error);

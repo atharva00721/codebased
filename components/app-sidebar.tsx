@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useUser } from "@clerk/nextjs";
-import { ModeToggle } from "./theme-toggle";
+
 import { ProjectSwitcher } from "./project-switcher";
 import useProject from "@/hooks/useProject";
 
@@ -54,7 +54,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
   return (
     <Sidebar
-      className="border-none"
+      className="border-none bg-themeWarmerCream dark:bg-themeGray"
       variant="sidebar"
       {...props}
       collapsible="icon"
@@ -71,9 +71,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={iteams.navMain} />
       </SidebarContent>
-      <SidebarFooter>
+      {/* <SidebarFooter>
         <ModeToggle />
-      </SidebarFooter>
+      </SidebarFooter> */}
     </Sidebar>
   );
 }

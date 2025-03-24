@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLinkIcon, Github } from "lucide-react";
+import { ExternalLinkIcon, Github, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import CommitBox from "./_components/commit-box";
 import GlassCard from "@/components/glass-card";
@@ -19,45 +19,45 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="flex w-full flex-col gap-y-4 p-1 no-scrollbar">
-      <div className="flex w-full flex-wrap items-center justify-between gap-y-4">
-        <div className="flex w-fit rounded-md bg-purple-400 px-4 py-3 text-white dark:text-themeDarkGray">
-          <Github className="size-5" />
-          <div className="ml-2">
-            <p className="text-sm font-medium text-primary ">
-              This Project is Linked to{" "}
-              <Link
-                href={project?.githubUrl ?? ""}
-                className="inline-flex items-center hover:underline"
-              >
-                {project?.name}
-
-                <ExternalLinkIcon className="ml-1 size-3" />
-              </Link>
-            </p>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <header className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center space-x-3">
+          <Github className="size-5 text-zinc-500" />
+          <Link
+            href={project?.githubUrl ?? ""}
+            className="text-sm hover:text-purple-500 transition-colors flex items-center"
+          >
+            {project?.name}
+            <ExternalLinkIcon className="ml-1.5 size-3" />
+          </Link>
         </div>
-
-        <div className="h-4"></div>
-
-        <Button className="dark:bg-themeBlack bg-white text-themeBlack dark:text-white hover:bg-white/50">
-          Invite Button
+        {/* //TODO: add update commit */}
+        <Button
+          variant="outline"
+          className="h-9
+        "
+          disabled
+        >
+          <RefreshCcw className="mr-2 size-4" />
+          Update Commits
         </Button>
-      </div>
+      </header>
 
-      <div className="mt-2">
-        <div className="grid grid-cols-1 gap-4">
-          <GlassCard className="rounded-lg border-none hover:ring-1 hover:ring-purple-300/30 transition-all duration-300 min-h-[200px]">
-            <div className="cursor-pointer h-full" onClick={navigateToChat}>
-              <GridPatternCardDemo projectName={project?.name} />
-            </div>
-          </GlassCard>
+      <main className="space-y-6">
+        <div
+          className="h-[200px] transition-all cursor-pointer"
+          onClick={navigateToChat}
+        >
+          <GridPatternCardDemo projectName={project?.name} />
         </div>
-      </div>
-      <div className="pb-5">
-        <CommitBox />
-      </div>
+
+        <div>
+          <h3 className="text-sm font-medium mb-3 text-zinc-500">Activity</h3>
+          <CommitBox />
+        </div>
+      </main>
     </div>
   );
 };
+
 export default DashboardPage;

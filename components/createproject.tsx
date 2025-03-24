@@ -66,8 +66,8 @@ const CreateProject = () => {
   return (
     <Aether>
       <AetherTrigger className="hover:bg-background/670 flex gap-2 rounded-xl bg-background p-2">
-        <div className="flex size-6 items-center justify-center rounded-lg border bg-background">
-          <Plus className="size-4" />
+        <div className="flex size-6 items-center justify-center rounded-lg border bg-themeAccent">
+          <Plus className="size-4 text-themeTextWhite" />
         </div>
         <div className="text-mute d-foreground mr-2 font-light">
           Add Project

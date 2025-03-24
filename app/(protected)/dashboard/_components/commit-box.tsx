@@ -118,7 +118,7 @@ const CommitBox = () => {
                 "absolute left-0 top-0 flex w-6 justify-center"
               )}
             >
-              <div className="w-[2px] translate-x-3 translate-y-5 bg-gradient-to-b from-pink-700 to-purple-400"></div>
+              <div className="w-[2px] translate-x-3 translate-y-5 bg-themeAccent dark:bg-gradient-to-b dark:from-pink-700 dark:to-purple-400"></div>
             </div>
             <>
               <Image

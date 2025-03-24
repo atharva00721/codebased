@@ -97,7 +97,11 @@ export function MessageInput({
           <div className="text-right">
             <p className="text-sm font-medium">{name}</p>
             <p className="text-xs text-green-500 font-medium">
-              {credits !== null ? `Credits: ${credits}` : "Credits: -"}
+              {isLoadingProfile
+                ? "Loading..."
+                : typeof userProfile?.credits === "number"
+                ? `Credits: ${userProfile.credits}`
+                : "Credits: -"}
             </p>
           </div>
           <Avatar className="h-8 w-8">
