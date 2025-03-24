@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ExternalLinkIcon, Github, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import CommitBox from "./_components/commit-box";
-import GlassCard from "@/components/glass-card";
 import { Button } from "@/components/ui/button";
 import useProject from "@/hooks/useProject";
 import { GridPatternCardDemo } from "./_components/chatBoxShortcut";

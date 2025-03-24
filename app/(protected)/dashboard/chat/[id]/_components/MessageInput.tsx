@@ -61,7 +61,6 @@ export function MessageInput({
   const initials = getInitials();
   const imageUrl = userProfile?.imageUrl || clerkUser?.imageUrl;
   const name = userProfile?.firstName || clerkUser?.firstName || "User";
-  const credits = userProfile?.credits;
 
   return (
     <div className="border-t mt-4 pt-4">

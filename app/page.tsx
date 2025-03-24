@@ -82,15 +82,15 @@ export default function Home() {
             <MessageSquare size={18} />
             Start Chatting
           </a>
-            <a
+          <a
             className="rounded-full border border-solid border-themeAccent transition-colors flex items-center justify-center bg-transparent hover:bg-themeAccent/10 text-sm h-10 sm:h-11 w-10 sm:w-11 p-0 text-foreground hover:text-themeAccent"
             href="https://github.com/atharva00721/codebased"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="View on GitHub"
-            >
-            <GitHubIcon  size={16} />
-            </a>
+          >
+            <GitHubIcon size={16} />
+          </a>
         </div>
         {/* Mobile-optimized Tabs */}
         <div className="w-full">
@@ -268,7 +268,7 @@ export default function Home() {
                       }}
                     >
                       <p className="text-themeAccent mb-2 font-medium">
-                        "{example.query}"
+                        &quot;{example.query}&quot;
                       </p>
                       <p className="text-themeTextMutedGray dark:text-themeTextGray">
                         {example.response}
