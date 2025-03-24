@@ -343,7 +343,7 @@ export default function Home() {
                           Codebased uses Retrieval Augmented Generation (RAG) to
                           provide accurate context-aware responses about your
                           code. This combines the power of AI with your
-                          codebase's specific information.
+                          codebase&apos;s specific information.
                         </p>
                       </div>
 
