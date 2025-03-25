@@ -13,6 +13,7 @@ import {
   initializeRepositoryRagAction,
   queryRepositoryRagAction,
 } from "@/app/actions/rag";
+import { streamRagResponse, clearChatAction } from "@/app/actions/stream";
 
 import { EmptyChat } from "./_components/EmptyChat";
 import { ChatMessage } from "./_components/ChatMessage";
@@ -148,10 +149,9 @@ export default function ChatPage() {
 
     if (!input.trim() || isLoading || !projectId) return;
 
-    // Add user message
     const userMessage: Message = {
       role: "user",
-      content: input.trim(), // Ensure content is trimmed
+      content: input.trim(),
       timestamp: new Date(),
     };
 
@@ -159,10 +159,7 @@ export default function ChatPage() {
     setInput("");
     setIsLoading(true);
 
-    // Generate a unique ID for the streaming message
     const streamingMessageId = crypto.randomUUID?.() || `msg-${Date.now()}`;
-
-    // Add initial empty assistant message for streaming
     const initialAiMessage: Message = {
       id: streamingMessageId,
       role: "assistant",
@@ -174,46 +171,31 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, initialAiMessage]);
 
     try {
-      // Format message history for API
       const messageHistory = chatHistoryRef.current.map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      // NOTE: Keep using the streaming API endpoint for streaming responses
-      // Server actions don't support streaming responses out of the box yet
-      const response = await fetch("/api/rag/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          query: input.trim(),
-          messageHistory,
-        }),
+      const stream = await streamRagResponse({
+        projectId,
+        query: input.trim(),
+        messageHistory,
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error(
-          !response.ok ? "API response error" : "Stream not supported"
-        );
-      }
-
-      // Read the stream with optimized parsing
-      const reader = response.body.getReader();
+      const reader = stream.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = "";
       let sources = [];
       let lastUpdateTime = Date.now();
-      const updateInterval = 100; // Update UI at most every 100ms
+      const updateInterval = 100;
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value);
 
         try {
-          // Check if the chunk is a special message indicating sources
           if (chunk.includes("__SOURCES__:")) {
             const parts = chunk.split("__SOURCES__:");
             if (parts[0]) accumulatedContent += parts[0];
@@ -224,10 +206,8 @@ export default function ChatPage() {
             continue;
           }
 
-          // Otherwise treat it as regular content
           accumulatedContent += chunk;
 
-          // Throttle UI updates for better performance
           const now = Date.now();
           if (now - lastUpdateTime >= updateInterval) {
             setMessages((prev) =>
@@ -244,7 +224,6 @@ export default function ChatPage() {
         }
       }
 
-      // Final update with complete message
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === streamingMessageId
@@ -263,7 +242,6 @@ export default function ChatPage() {
         description: "Failed to get a response. Please try again.",
       });
 
-      // Remove the streaming message on error
       setMessages((prev) =>
         prev.filter((msg) => msg.id !== streamingMessageId)
       );
@@ -276,21 +254,8 @@ export default function ChatPage() {
   const clearChat = async () => {
     if (isLoading || !projectId) return;
 
-    setMessages([]);
-
-    // Note: You'll need to implement a clearChatHistory server action
     try {
-      // This would be replaced with a direct server action call
-      // await clearChatHistoryAction(projectId);
-
-      // Keep using the API for now since we haven't created the server action yet
-      await fetch("/api/rag/clear-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
-      });
-
-      // Add welcome message
+      await clearChatAction(projectId);
       setMessages([
         {
           role: "assistant",

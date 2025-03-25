@@ -381,7 +381,7 @@ function extractCodeStructure(content: string, filePath: string): string {
     const extension = filePath
       .substring(filePath.lastIndexOf("."))
       .toLowerCase();
-    const structure = [];
+    const structure: string[] = [];
 
     if ([".ts", ".tsx", ".js", ".jsx"].includes(extension)) {
       extractJavaScriptStructure(content, structure);
@@ -743,58 +743,71 @@ async function filterUnprocessedCommits(
 // Main function to pull and store commits
 export const pullCommits = async (projectId: string, token?: string) => {
   try {
-    // Fetch project details
     const project = await db.project.findUnique({
       where: { id: projectId },
-      select: {
-        githubUrl: true,
-        deleteAt: true,
-      },
+      select: { githubUrl: true, deleteAt: true },
     });
 
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
+    if (!project) throw new Error("Project not found");
     if (project.deleteAt && project.deleteAt <= new Date()) {
       throw new Error("Project has been deleted");
     }
 
-    // Process commits
-    const commits = await gitCommitProcessor(
-      project.githubUrl,
-      projectId,
-      token
-    );
+    // Get most recent commit from database first
+    const latestCommit = await db.commit.findFirst({
+      where: { projectId },
+      orderBy: { commitDate: "desc" },
+      select: { commitHash: true },
+    });
 
-    // Filter out already processed commits
-    const newCommits = await filterUnprocessedCommits(commits, projectId);
+    // Process only new commits
+    const [owner, repo] = project.githubUrl.split("/").slice(-2);
+    const octokit = createOctokit(token);
 
-    if (newCommits.length === 0) {
+    const { data } = await octokit.repos.listCommits({
+      owner,
+      repo,
+      per_page: 5, // Reduced from 15 to 5 since we only need recent commits
+    });
+
+    // If our latest commit matches the most recent GitHub commit, no updates needed
+    if (latestCommit && data[0].sha === latestCommit.commitHash) {
       return [];
     }
 
-    // Process commits in batches
-    const savedCommits = [];
-    for (let i = 0; i < newCommits.length; i += BATCH_SIZE) {
-      const batch = newCommits.slice(i, i + BATCH_SIZE);
-      // Use the result or remove the assignment
-      await db.commit.createMany({
-        data: batch.map((commit) => ({
-          projectId: commit.projectId,
-          commitHash: commit.commitHash,
-          commitMessage: commit.commitMessage,
-          commitAuthorName: commit.commitAuthorName,
-          commitAuthorAvatar: commit.commitAuthorAvatar,
-          commitDate: commit.commitDate,
-          summary: commit.summary,
-        })),
-      });
-      savedCommits.push(...batch);
-      await delay(1000); // Add delay between batches
-    }
+    // Find the index where our commits diverge
+    const newCommitsData = latestCommit
+      ? data.slice(
+          0,
+          data.findIndex((c) => c.sha === latestCommit.commitHash)
+        )
+      : data;
 
-    return savedCommits;
+    if (newCommitsData.length === 0) return [];
+
+    // Only process the new commits
+    const processedCommits = await Promise.all(
+      newCommitsData.map(async (commit: GitHubCommit) => {
+        const diff = await fetchCommitDiff(owner, repo, commit.sha, token);
+        const summary = await retryWithDelay(
+          () => AISummarizeCommits(diff),
+          3,
+          1000
+        );
+
+        return {
+          projectId,
+          commitHash: commit.sha,
+          commitMessage: commit.commit.message || "",
+          commitAuthorName: commit.commit?.author?.name || "",
+          commitAuthorAvatar: commit?.author?.avatar_url || "",
+          commitDate: new Date(commit.commit?.author?.date || Date.now()),
+          summary,
+        };
+      })
+    );
+
+    return processedCommits;
   } catch (error) {
     console.error("Error pulling commits:", error);
     throw error;

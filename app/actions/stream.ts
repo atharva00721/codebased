@@ -2,7 +2,8 @@
 
 import { db } from "@/server/db";
 import { searchSimilarCode } from "@/lib/github";
-import { streamGeminiResponse } from "@/lib/gemini";
+import { clearChatHistory, streamGeminiResponse } from "@/lib/gemini";
+import { auth } from "@clerk/nextjs/server";
 
 /**
  * Server action to stream AI responses with relevant code snippets
@@ -10,9 +11,15 @@ import { streamGeminiResponse } from "@/lib/gemini";
 export async function streamRagResponse(formData: {
   projectId: string;
   query: string;
+  messageHistory?: { role: string; content: string }[];
 }) {
   try {
-    const { projectId, query } = formData;
+    const { userId } = await auth();
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const { projectId, query, messageHistory } = formData;
 
     if (!projectId || !query) {
       throw new Error("Missing required parameters");
@@ -44,9 +51,6 @@ export async function streamRagResponse(formData: {
       projectId
     );
 
-    // Server actions don't use StreamingTextResponse
-    // Instead, they return data directly to the client
-    // Create a ReadableStream that we'll return from the action
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -56,32 +60,47 @@ export async function streamRagResponse(formData: {
             return;
           }
 
-          // Stream the AI response
           for await (const chunk of responseStream.stream) {
-            controller.enqueue(encoder.encode(chunk.text()));
+            const text = chunk.text();
+            controller.enqueue(encoder.encode(text));
           }
 
-          // After streaming content, send sources as a special message
+          // Send sources as a special message at the end
           const sourcesData = JSON.stringify(relevantSources);
           controller.enqueue(encoder.encode(`__SOURCES__:${sourcesData}`));
 
           controller.close();
         } catch (error) {
-          console.error("Error processing stream:", error);
+          console.error("Error in stream:", error);
           controller.error(error);
         }
       },
     });
 
-    // Return the stream directly from the server action
-    // The client will need to handle this appropriately
     return stream;
   } catch (error) {
     console.error("Stream action error:", error);
-    throw new Error(
-      error instanceof Error
-        ? error.message
-        : "Failed to process streaming request"
-    );
+    throw error;
+  }
+}
+
+export async function clearChatAction(projectId: string) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!projectId) {
+      throw new Error("Project ID is required");
+    }
+
+    // Clear chat history using the existing function
+    await clearChatHistory(projectId);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error clearing chat:", error);
+    throw error;
   }
 }
