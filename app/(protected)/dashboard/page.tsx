@@ -4,17 +4,29 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLinkIcon, Github, RefreshCcw } from "lucide-react";
 import Link from "next/link";
-import CommitBox from "./_components/commit-box";
+import CommitBox, { CommitBoxHandle } from "./_components/commit-box";
 import { Button } from "@/components/ui/button";
 import useProject from "@/hooks/useProject";
 import { GridPatternCardDemo } from "./_components/chatBoxShortcut";
+import { cn } from "@/lib/utils";
 
 const DashboardPage = () => {
   const { project, projectId } = useProject();
   const router = useRouter();
+  const [updating, setUpdating] = React.useState(false);
+  const commitBoxRef = React.useRef<CommitBoxHandle>(null);
 
   const navigateToChat = () => {
     router.push(`/dashboard/chat/${projectId}`);
+  };
+
+  const handleUpdateCommits = async () => {
+    setUpdating(true);
+    try {
+      await commitBoxRef.current?.updateCommits();
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (
@@ -30,15 +42,16 @@ const DashboardPage = () => {
             <ExternalLinkIcon className="ml-1.5 size-3" />
           </Link>
         </div>
-        {/* //TODO: add update commit */}
         <Button
           variant="outline"
-          className="h-9
-        "
-          disabled
+          className="h-9"
+          onClick={handleUpdateCommits}
+          disabled={updating || !projectId}
         >
-          <RefreshCcw className="mr-2 size-4" />
-          Update Commits
+          <RefreshCcw
+            className={cn("mr-2 size-4", updating && "animate-spin")}
+          />
+          {updating ? "Updating..." : "Update Commits"}
         </Button>
       </header>
 
@@ -52,7 +65,7 @@ const DashboardPage = () => {
 
         <div>
           <h3 className="text-sm font-medium mb-3 text-zinc-500">Activity</h3>
-          <CommitBox />
+          <CommitBox ref={commitBoxRef} />
         </div>
       </main>
     </div>

@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Commit } from "@prisma/client";
 import useProject from "@/hooks/useProject";
 import {
   CardContent,
@@ -11,22 +17,41 @@ import Image from "next/image";
 import GlassCard from "@/components/glass-card";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { getCommits, checkAndUpdateCommits } from "@/app/actions/commits";
 
-type Commit = {
-  id: string;
-  commitHash: string;
-  commitMessage: string;
-  commitAuthorName: string;
-  commitAuthorAvatar: string;
-  commitDate: string;
-  summary: string;
-};
+export interface CommitBoxHandle {
+  updateCommits: () => Promise<void>;
+}
 
-const CommitBox = () => {
+const CommitBox = forwardRef<CommitBoxHandle>((_, ref) => {
   const { projectId, project } = useProject();
   const [commits, setCommits] = useState<Commit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const updateCommits = async () => {
+    if (!projectId) return;
+
+    setLoading(true);
+    try {
+      const updates = await checkAndUpdateCommits(projectId);
+      if (updates) {
+        const newCommits = await getCommits(projectId);
+        setCommits(newCommits);
+      }
+    } catch (error) {
+      console.error("Error updating commits:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to update commits"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    updateCommits,
+  }));
 
   useEffect(() => {
     const fetchCommits = async () => {
@@ -40,27 +65,7 @@ const CommitBox = () => {
       setError(null);
 
       try {
-        const response = await fetch("/api/commits", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ projectId }),
-        });
-
-        const data = await response.json();
-        console.log("API Response status:", response.status);
-        console.log("API Response data:", data);
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch commits");
-        }
-
-        if (!Array.isArray(data)) {
-          console.error("Unexpected data format:", data);
-          throw new Error("Invalid data format received from server");
-        }
-
+        const data = await getCommits(projectId);
         setCommits(data);
         console.log("Successfully set commits:", data.length);
       } catch (error) {
@@ -161,6 +166,6 @@ const CommitBox = () => {
       </ul>
     </div>
   );
-};
+});
 
 export default CommitBox;

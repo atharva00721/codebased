@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { pullCommits } from "@/lib/github";
-import { db } from "@/server/db";
+import { getCommits, checkAndUpdateCommits } from "@/app/actions/commits";
 
 export async function POST(request: Request) {
   try {
-    const { projectId } = await request.json();
+    const { projectId, checkUpdates } = await request.json();
     console.log("Received request for commits with projectId:", projectId);
 
     if (!projectId) {
@@ -14,27 +13,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // First try to get existing commits from the database
-    const existingCommits = await db.commit.findMany({
-      where: {
-        projectId: projectId,
-      },
-      orderBy: {
-        commitDate: "desc",
-      },
-    });
-
-    console.log("Found existing commits:", existingCommits.length);
-
-    if (existingCommits.length > 0) {
-      return NextResponse.json(existingCommits);
+    if (checkUpdates) {
+      const updates = await checkAndUpdateCommits(projectId);
+      if (updates) {
+        return NextResponse.json({
+          updated: true,
+          commits: await getCommits(projectId),
+        });
+      }
+      return NextResponse.json({ updated: false });
     }
 
-    // If no existing commits, fetch new ones
-    console.log("No existing commits found, fetching from GitHub...");
-    const commits = await pullCommits(projectId);
-    console.log("Fetched new commits from GitHub:", commits.length);
-
+    const commits = await getCommits(projectId);
     return NextResponse.json(commits);
   } catch (error) {
     console.error("API Error:", error);

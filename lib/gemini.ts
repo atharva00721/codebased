@@ -61,6 +61,46 @@ class LRUChatSessions {
 
 const chatSessions = new LRUChatSessions();
 
+// Add rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 10, // Maximum requests per minute
+  interval: 60000, // 1 minute in milliseconds
+  retryDelay: 15000, // 15 seconds delay when hitting rate limit
+};
+
+let requestCount = 0;
+let lastRequestTime = Date.now();
+
+// Add rate limiting helper
+async function rateLimitedRequest<T>(fn: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  if (now - lastRequestTime > RATE_LIMIT.interval) {
+    // Reset counter after interval
+    requestCount = 0;
+    lastRequestTime = now;
+  }
+
+  if (requestCount >= RATE_LIMIT.maxRequests) {
+    console.log("Rate limit reached, waiting...");
+    await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT.retryDelay));
+    return rateLimitedRequest(fn);
+  }
+
+  requestCount++;
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (error?.status === 429) {
+      console.log("Rate limit exceeded, retrying after delay...");
+      await new Promise((resolve) =>
+        setTimeout(resolve, RATE_LIMIT.retryDelay)
+      );
+      return rateLimitedRequest(fn);
+    }
+    throw error;
+  }
+}
+
 /**
  * Summarize Git Commit Diffs using Gemini AI
  * @param diff - The git diff string to be summarized
@@ -68,8 +108,9 @@ const chatSessions = new LRUChatSessions();
  */
 export const AISummarizeCommits = async (diff: string): Promise<string> => {
   try {
-    const response = await model.generateContent([
-      `You are an expert programmer, and you are trying to summarize a git diff.
+    const response = await rateLimitedRequest(() =>
+      model.generateContent([
+        `You are an expert programmer, and you are trying to summarize a git diff.
 
 Reminders about the git diff format:
 
@@ -104,15 +145,16 @@ because there were more than two relevant files in the hypothetical commit.
 
 Do not include parts of the example in your summary.
 It is given only as an example of appropriate comments.`,
-      `Please summarize the following diff files:\n\n${diff}`,
-    ]);
+        `Please summarize the following diff files:\n\n${diff}`,
+      ])
+    );
 
     const summary = response.response.text();
     console.log("Commit Diff Summary:", summary);
     return summary || "No summary available";
   } catch (error) {
     console.error("Error summarizing commit diff:", error);
-    return "Failed to generate commit summary";
+    return "Failed to generate commit summary - Rate limit exceeded";
   }
 };
 
@@ -128,25 +170,27 @@ export const summariseCode = async (doc: Document): Promise<string> => {
     // Limit code to first 10000 characters
     const code = doc.pageContent.slice(0, 10000);
 
-    const response = await model.generateContent([
-      `You are an intelligent senior software engineer who specialises in onboarding junior software engineers onto projects.`,
-      `You are onboarding a junior software engineer and explaining to them the purpose of the ${doc.metadata.src} file
+    const response = await rateLimitedRequest(() =>
+      model.generateContent([
+        `You are an intelligent senior software engineer who specialises in onboarding junior software engineers onto projects.`,
+        `You are onboarding a junior software engineer and explaining to them the purpose of the ${doc.metadata.src} file
 
-      here is the code:
-
-
-----
-
-
-      ${code}
+        here is the code:
 
 
 ----
 
 
+        ${code}
 
-      Give a summary no more than 100 words of above code`,
-    ]);
+
+----
+
+
+
+        Give a summary no more than 100 words of above code`,
+      ])
+    );
 
     const summary = response.response.text();
     console.log("Code Summary:", summary);
@@ -168,7 +212,9 @@ export async function generateEmbedding(summary: string): Promise<number[]> {
       model: "text-embedding-004",
     });
 
-    const result = await embeddingModel.embedContent(summary);
+    const result = await rateLimitedRequest(() =>
+      embeddingModel.embedContent(summary)
+    );
     const embedding = result.embedding;
 
     return embedding.values;
