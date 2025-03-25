@@ -212,55 +212,19 @@ function shouldProcessFile(path: string) {
 
 // Process file content and store its embedding
 async function processFileContent(
-  file: { path: string; type: string; [key: string]: unknown }, // Changed any to unknown for better type safety
+  file: { path: string; type: string; [key: string]: unknown },
   owner: string,
   repo: string,
   projectId: string,
   token?: string
 ) {
-  const octokit = createOctokit(token);
   try {
     // Get file content
-    const response = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: file.path,
-      mediaType: {
-        format: "raw",
-      },
-    });
-
-    // More explicit typing to ensure TypeScript recognizes content as a string
-    const content: string =
-      typeof response.data === "string" ? response.data : "";
+    const content = await fetchFileContent(file, owner, repo, token);
     if (!content) return;
 
-    // Analyze the file content to extract metadata
-    let summary = "";
-
-    // Check if codeAnalyzer module is imported/available
-    try {
-      // Use dynamic import instead of require()
-      const codeAnalyzer = await import("./codeAnalyzer");
-      const { analyzeCodeFile, generateCodeSummary } = codeAnalyzer;
-      const metadata = analyzeCodeFile(content, file.path);
-      summary = generateCodeSummary(content, metadata, file.path);
-      console.log(
-        `Generated code summary for ${file.path} with metadata extraction`
-      );
-    } catch (analyzerError) {
-      // Fallback to simple extraction if code analyzer fails
-      console.log(
-        `Using fallback summary generation for ${file.path}: ${analyzerError}`
-      );
-      const codeStructure = extractCodeStructure(content, file.path);
-      summary = `File: ${
-        file.path
-      }\n\nStructure:\n${codeStructure}\n\nContent Preview:\n${content.substring(
-        0,
-        500
-      )}`;
-    }
+    // Generate summary for the file
+    const summary = await generateFileSummary(content, file.path);
 
     // Generate embedding for the summary
     console.log(`Generating embedding for ${file.path}`);
@@ -272,72 +236,142 @@ async function processFileContent(
       return;
     }
 
-    // Log the embeddings vector to check its format
-    console.log(`Embedding type: ${typeof embedding}`);
-    console.log(`First few values: ${embedding.slice(0, 3)}`);
-
-    // Create a unique ID
-    const uniqueId = await createUniqueId(projectId, file.path);
-
-    try {
-      // Insert/update the embedding using raw SQL to ensure vector format is correct
-      await db.$executeRaw`
-        INSERT INTO "SourceCodeEmbedding" 
-        ("id", "projectId", "fileName", "sourceCode", "summary", "summaryEmbedding", "createdAt", "updatedAt")
-        VALUES (
-          ${uniqueId},
-          ${projectId},
-          ${file.path},
-          ${content.substring(0, 10000)},
-          ${summary},
-          ${embedding}::vector(768),
-          ${new Date()},
-          ${new Date()}
-        )
-        ON CONFLICT ("id") DO UPDATE SET
-          "sourceCode" = ${content.substring(0, 10000)},
-          "summary" = ${summary},
-          "summaryEmbedding" = ${embedding}::vector(768),
-          "updatedAt" = ${new Date()}
-      `;
-
-      console.log(`Successfully stored embedding for ${file.path}`);
-    } catch (sqlError) {
-      console.error(`SQL error processing ${file.path}:`, sqlError);
-
-      // Try with a random ID as last resort
-      try {
-        const randomId = `${projectId.substring(0, 8)}_${Math.random()
-          .toString(36)
-          .substring(2, 15)}`;
-
-        await db.$executeRaw`
-          INSERT INTO "SourceCodeEmbedding" 
-          ("id", "projectId", "fileName", "sourceCode", "summary", "summaryEmbedding", "createdAt", "updatedAt")
-          VALUES (
-            ${randomId},
-            ${projectId},
-            ${file.path},
-            ${content.substring(0, 10000)},
-            ${summary},
-            ${embedding}::vector(768),
-            ${new Date()},
-            ${new Date()}
-          )
-        `;
-
-        console.log(
-          `Last resort approach succeeded for ${file.path} with random ID`
-        );
-      } catch (lastError) {
-        console.error(
-          `Last resort approach also failed for ${file.path}:`,
-          lastError
-        );
-      }
-    }
+    // Store the embedding in the database
+    await storeFileEmbedding(projectId, file.path, content, summary, embedding);
   } catch (error) {
     console.error(`Error processing file ${file.path}:`, error);
+  }
+}
+
+// Fetch file content from GitHub
+async function fetchFileContent(
+  file: { path: string; type: string; [key: string]: unknown },
+  owner: string,
+  repo: string,
+  token?: string
+): Promise<string> {
+  const octokit = createOctokit(token);
+  try {
+    const response = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: file.path,
+      mediaType: {
+        format: "raw",
+      },
+    });
+
+    return typeof response.data === "string" ? response.data : "";
+  } catch (error) {
+    console.error(`Error fetching content for ${file.path}:`, error);
+    return "";
+  }
+}
+
+// Generate summary for a file
+async function generateFileSummary(
+  content: string,
+  filePath: string
+): Promise<string> {
+  try {
+    // Try using the code analyzer for a detailed summary
+    const codeAnalyzer = await import("./codeAnalyzer");
+    const { analyzeCodeFile, generateCodeSummary } = codeAnalyzer;
+    const metadata = analyzeCodeFile(content, filePath);
+    const summary = generateCodeSummary(content, metadata, filePath);
+    console.log(
+      `Generated code summary for ${filePath} with metadata extraction`
+    );
+    return summary;
+  } catch (analyzerError) {
+    // Fallback to simple extraction if code analyzer fails
+    console.log(
+      `Using fallback summary generation for ${filePath}: ${analyzerError}`
+    );
+    const codeStructure = extractCodeStructure(content, filePath);
+    return `File: ${filePath}\n\nStructure:\n${codeStructure}\n\nContent Preview:\n${content.substring(
+      0,
+      500
+    )}`;
+  }
+}
+
+// Store file embedding in the database
+async function storeFileEmbedding(
+  projectId: string,
+  filePath: string,
+  content: string,
+  summary: string,
+  embedding: number[]
+): Promise<void> {
+  // Create a unique ID
+  const uniqueId = await createUniqueId(projectId, filePath);
+
+  try {
+    // Insert/update the embedding using raw SQL
+    await db.$executeRaw`
+      INSERT INTO "SourceCodeEmbedding" 
+      ("id", "projectId", "fileName", "sourceCode", "summary", "summaryEmbedding", "createdAt", "updatedAt")
+      VALUES (
+        ${uniqueId},
+        ${projectId},
+        ${filePath},
+        ${content.substring(0, 10000)},
+        ${summary},
+        ${embedding}::vector(768),
+        ${new Date()},
+        ${new Date()}
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "sourceCode" = ${content.substring(0, 10000)},
+        "summary" = ${summary},
+        "summaryEmbedding" = ${embedding}::vector(768),
+        "updatedAt" = ${new Date()}
+    `;
+
+    console.log(`Successfully stored embedding for ${filePath}`);
+  } catch (sqlError) {
+    console.error(`SQL error processing ${filePath}:`, sqlError);
+    await tryFallbackStorage(projectId, filePath, content, summary, embedding);
+  }
+}
+
+// Try a fallback approach to store embeddings when the primary method fails
+async function tryFallbackStorage(
+  projectId: string,
+  filePath: string,
+  content: string,
+  summary: string,
+  embedding: number[]
+): Promise<void> {
+  try {
+    const randomId = `${projectId.substring(0, 8)}_${Math.random()
+      .toString(36)
+      .substring(2, 15)}`;
+
+    await db.$executeRaw`
+      INSERT INTO "SourceCodeEmbedding" 
+      ("id", "projectId", "fileName", "sourceCode", "summary", "summaryEmbedding", "createdAt", "updatedAt")
+      VALUES (
+        ${randomId},
+        ${projectId},
+        ${filePath},
+        ${content.substring(0, 10000)},
+        ${summary},
+        ${embedding}::vector(768),
+        ${new Date()},
+        ${new Date()}
+      )
+    `;
+
+    console.log(
+      `Last resort approach succeeded for ${filePath} with random ID`
+    );
+  } catch (lastError) {
+    console.error(
+      `Last resort approach also failed for ${filePath}:`,
+      lastError
+    );
   }
 }
 
@@ -347,99 +381,12 @@ function extractCodeStructure(content: string, filePath: string): string {
     const extension = filePath
       .substring(filePath.lastIndexOf("."))
       .toLowerCase();
-    const structure = []; // Changed from let to const as it's never reassigned
+    const structure = [];
 
-    // Extract function and class names based on file type
     if ([".ts", ".tsx", ".js", ".jsx"].includes(extension)) {
-      // JavaScript/TypeScript patterns
-      const functionMatches =
-        content.match(/(?:function|const|let|var)\s+(\w+)\s*\([^)]*\)/g) || [];
-      const arrowFunctionMatches =
-        content.match(
-          /(?:const|let|var)\s+(\w+)\s*=\s*(?:\([^)]*\)|[^=]*)\s*=>/g
-        ) || [];
-      const classMatches = content.match(/class\s+(\w+)/g) || [];
-      const importMatches =
-        content.match(/import\s+.*from\s+['"]([^'"]+)['"]/g) || [];
-
-      // Add functions
-      if (functionMatches.length) {
-        structure.push("Functions:");
-        functionMatches.slice(0, 5).forEach((match) => {
-          const name = match.match(/(?:function|const|let|var)\s+(\w+)/) || [];
-          if (name[1]) structure.push(`- ${name[1]}`);
-        });
-      }
-
-      // Add arrow functions
-      if (arrowFunctionMatches.length) {
-        if (!structure.includes("Functions:")) structure.push("Functions:");
-        arrowFunctionMatches.slice(0, 5).forEach((match) => {
-          const name = match.match(/(?:const|let|var)\s+(\w+)/) || [];
-          if (name[1]) structure.push(`- ${name[1]} (arrow)`);
-        });
-      }
-
-      // Add classes
-      if (classMatches.length) {
-        structure.push("Classes:");
-        classMatches.slice(0, 3).forEach((match) => {
-          const name = match.match(/class\s+(\w+)/) || [];
-          if (name[1]) structure.push(`- ${name[1]}`);
-        });
-      }
-
-      // Add imports
-      if (importMatches.length) {
-        structure.push("Dependencies:");
-        const uniqueImports = new Set();
-        importMatches.forEach((match) => {
-          const importPath = match.match(/from\s+['"]([^'"]+)['"]/) || [];
-          if (importPath[1]) uniqueImports.add(importPath[1]);
-        });
-
-        Array.from(uniqueImports)
-          .slice(0, 5)
-          .forEach((importPath) => {
-            structure.push(`- ${importPath}`);
-          });
-      }
+      extractJavaScriptStructure(content, structure);
     } else if ([".py"].includes(extension)) {
-      // Python patterns - implement similar to JS/TS patterns to use these variables
-      const pythonFunctionMatches =
-        content.match(/def\s+(\w+)\s*\([^)]*\)/g) || [];
-      const pythonClassMatches = content.match(/class\s+(\w+)/g) || [];
-      const pythonImportMatches =
-        content.match(/(?:import|from)\s+(\S+)/g) || [];
-
-      // Add Python functions
-      if (pythonFunctionMatches.length) {
-        structure.push("Functions:");
-        pythonFunctionMatches.slice(0, 5).forEach((match) => {
-          const name = match.match(/def\s+(\w+)/) || [];
-          if (name[1]) structure.push(`- ${name[1]}`);
-        });
-      }
-
-      // Add Python classes
-      if (pythonClassMatches.length) {
-        structure.push("Classes:");
-        pythonClassMatches.slice(0, 3).forEach((match) => {
-          const name = match.match(/class\s+(\w+)/) || [];
-          if (name[1]) structure.push(`- ${name[1]}`);
-        });
-      }
-
-      // Add Python imports
-      if (pythonImportMatches.length) {
-        structure.push("Dependencies:");
-        pythonImportMatches.slice(0, 5).forEach((match) => {
-          const importName = match
-            .replace(/^(import|from)\s+/, "")
-            .split(/\s+/)[0];
-          structure.push(`- ${importName}`);
-        });
-      }
+      extractPythonStructure(content, structure);
     }
 
     // If no structure was detected
@@ -454,7 +401,102 @@ function extractCodeStructure(content: string, filePath: string): string {
   }
 }
 
-// Search similar code using embeddings - improved with chunking
+// Extract structure from JavaScript/TypeScript files
+function extractJavaScriptStructure(
+  content: string,
+  structure: string[]
+): void {
+  // JavaScript/TypeScript patterns
+  const functionMatches =
+    content.match(/(?:function|const|let|var)\s+(\w+)\s*\([^)]*\)/g) || [];
+  const arrowFunctionMatches =
+    content.match(
+      /(?:const|let|var)\s+(\w+)\s*=\s*(?:\([^)]*\)|[^=]*)\s*=>/g
+    ) || [];
+  const classMatches = content.match(/class\s+(\w+)/g) || [];
+  const importMatches =
+    content.match(/import\s+.*from\s+['"]([^'"]+)['"]/g) || [];
+
+  // Add functions
+  if (functionMatches.length) {
+    structure.push("Functions:");
+    functionMatches.slice(0, 5).forEach((match) => {
+      const name = match.match(/(?:function|const|let|var)\s+(\w+)/) || [];
+      if (name[1]) structure.push(`- ${name[1]}`);
+    });
+  }
+
+  // Add arrow functions
+  if (arrowFunctionMatches.length) {
+    if (!structure.includes("Functions:")) structure.push("Functions:");
+    arrowFunctionMatches.slice(0, 5).forEach((match) => {
+      const name = match.match(/(?:const|let|var)\s+(\w+)/) || [];
+      if (name[1]) structure.push(`- ${name[1]} (arrow)`);
+    });
+  }
+
+  // Add classes
+  if (classMatches.length) {
+    structure.push("Classes:");
+    classMatches.slice(0, 3).forEach((match) => {
+      const name = match.match(/class\s+(\w+)/) || [];
+      if (name[1]) structure.push(`- ${name[1]}`);
+    });
+  }
+
+  // Add imports
+  if (importMatches.length) {
+    structure.push("Dependencies:");
+    const uniqueImports = new Set();
+    importMatches.forEach((match) => {
+      const importPath = match.match(/from\s+['"]([^'"]+)['"]/) || [];
+      if (importPath[1]) uniqueImports.add(importPath[1]);
+    });
+
+    Array.from(uniqueImports)
+      .slice(0, 5)
+      .forEach((importPath) => {
+        structure.push(`- ${importPath}`);
+      });
+  }
+}
+
+// Extract structure from Python files
+function extractPythonStructure(content: string, structure: string[]): void {
+  // Python patterns
+  const pythonFunctionMatches = content.match(/def\s+(\w+)\s*\([^)]*\)/g) || [];
+  const pythonClassMatches = content.match(/class\s+(\w+)/g) || [];
+  const pythonImportMatches = content.match(/(?:import|from)\s+(\S+)/g) || [];
+
+  // Add Python functions
+  if (pythonFunctionMatches.length) {
+    structure.push("Functions:");
+    pythonFunctionMatches.slice(0, 5).forEach((match) => {
+      const name = match.match(/def\s+(\w+)/) || [];
+      if (name[1]) structure.push(`- ${name[1]}`);
+    });
+  }
+
+  // Add Python classes
+  if (pythonClassMatches.length) {
+    structure.push("Classes:");
+    pythonClassMatches.slice(0, 3).forEach((match) => {
+      const name = match.match(/class\s+(\w+)/) || [];
+      if (name[1]) structure.push(`- ${name[1]}`);
+    });
+  }
+
+  // Add Python imports
+  if (pythonImportMatches.length) {
+    structure.push("Dependencies:");
+    pythonImportMatches.slice(0, 5).forEach((match) => {
+      const importName = match.replace(/^(import|from)\s+/, "").split(/\s+/)[0];
+      structure.push(`- ${importName}`);
+    });
+  }
+}
+
+// Search similar code using embeddings
 export const searchSimilarCode = async (
   projectId: string,
   query: string,
@@ -468,58 +510,74 @@ export const searchSimilarCode = async (
       throw new Error("Failed to generate embedding for query");
     }
 
-    // Explicitly cast the embedding to vector with proper dimensions
-    const similarContent = await db.$queryRaw`
-      SELECT 
-        id, 
-        "fileName", 
-        "sourceCode", 
-        summary,
-        1 - ("summaryEmbedding" <=> ${queryEmbedding}::vector(768)) as similarity
-      FROM 
-        "SourceCodeEmbedding"
-      WHERE 
-        "projectId" = ${projectId}
-      ORDER BY 
-        "summaryEmbedding" <=> ${queryEmbedding}::vector(768)
-      LIMIT ${limit}
-    `;
-
-    // Convert the similarity to a number for consistent typing
-    const processedResults = Array.isArray(similarContent)
-      ? similarContent.map((item) => ({
-          ...item,
-          similarity:
-            typeof item.similarity === "string"
-              ? parseFloat(item.similarity)
-              : item.similarity,
-        }))
-      : [];
-
-    // Enhance results with relevant line numbers and specific code segments
-    const enhancedResults =
-      processedResults.length > 0
-        ? await Promise.all(
-            processedResults.map(async (item: SourceCodeEmbeddingItem) => {
-              // Find the most relevant parts of the source code
-              const relevantSegments = findRelevantCodeSegments(
-                item.sourceCode || "",
-                query
-              );
-              return {
-                ...item,
-                relevantSegments,
-              };
-            })
-          )
-        : [];
-
-    return enhancedResults;
+    const similarContent = await findSimilarContentInDB(
+      projectId,
+      queryEmbedding,
+      limit
+    );
+    return await enhanceSearchResults(similarContent, query);
   } catch (error) {
     console.error("Error searching similar code:", error);
     return [];
   }
 };
+
+// Find similar content in database using vector similarity search
+async function findSimilarContentInDB(
+  projectId: string,
+  queryEmbedding: number[],
+  limit: number
+) {
+  // Explicitly cast the embedding to vector with proper dimensions
+  const similarContent = await db.$queryRaw`
+    SELECT 
+      id, 
+      "fileName", 
+      "sourceCode", 
+      summary,
+      1 - ("summaryEmbedding" <=> ${queryEmbedding}::vector(768)) as similarity
+    FROM 
+      "SourceCodeEmbedding"
+    WHERE 
+      "projectId" = ${projectId}
+    ORDER BY 
+      "summaryEmbedding" <=> ${queryEmbedding}::vector(768)
+    LIMIT ${limit}
+  `;
+
+  // Convert the similarity to a number for consistent typing
+  return Array.isArray(similarContent)
+    ? similarContent.map((item) => ({
+        ...item,
+        similarity:
+          typeof item.similarity === "string"
+            ? parseFloat(item.similarity)
+            : item.similarity,
+      }))
+    : [];
+}
+
+// Enhance search results with relevant code segments
+async function enhanceSearchResults(
+  results: SourceCodeEmbeddingItem[],
+  query: string
+) {
+  if (results.length === 0) return [];
+
+  return Promise.all(
+    results.map(async (item: SourceCodeEmbeddingItem) => {
+      // Find the most relevant parts of the source code
+      const relevantSegments = findRelevantCodeSegments(
+        item.sourceCode || "",
+        query
+      );
+      return {
+        ...item,
+        relevantSegments,
+      };
+    })
+  );
+}
 
 // Find most relevant segments of code based on query
 function findRelevantCodeSegments(
@@ -529,47 +587,8 @@ function findRelevantCodeSegments(
   try {
     // Split the source code into lines
     const lines = sourceCode.split("\n");
-    const queryTerms = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((term) => term.length > 3);
-    const segments: Array<{
-      lineStart: number;
-      lineEnd: number;
-      segment: string;
-      score: number;
-    }> = [];
-
-    // Window size for context (lines before and after a match)
-    const contextSize = 5;
-
-    // Look for matches of query terms in the code
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase();
-      let matchScore = 0;
-
-      // Check if line contains any query terms
-      queryTerms.forEach((term) => {
-        if (line.includes(term)) {
-          matchScore += 1;
-        }
-      });
-
-      if (matchScore > 0) {
-        // Found a match, get context
-        const lineStart = Math.max(0, i - contextSize);
-        const lineEnd = Math.min(lines.length - 1, i + contextSize);
-
-        const segment = lines.slice(lineStart, lineEnd + 1).join("\n");
-
-        segments.push({
-          lineStart: lineStart + 1, // 1-based line numbers
-          lineEnd: lineEnd + 1,
-          segment,
-          score: matchScore,
-        });
-      }
-    }
+    const queryTerms = extractQueryTerms(query);
+    const segments = identifyMatchingSegments(lines, queryTerms);
 
     // Sort by score and return top 3 segments
     return segments
@@ -584,6 +603,64 @@ function findRelevantCodeSegments(
     console.error("Error finding relevant code segments:", error);
     return [];
   }
+}
+
+// Extract relevant terms from a query
+function extractQueryTerms(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 3);
+}
+
+// Identify segments in code that match query terms
+function identifyMatchingSegments(
+  lines: string[],
+  queryTerms: string[]
+): Array<{
+  lineStart: number;
+  lineEnd: number;
+  segment: string;
+  score: number;
+}> {
+  const segments: Array<{
+    lineStart: number;
+    lineEnd: number;
+    segment: string;
+    score: number;
+  }> = [];
+  const contextSize = 5;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase();
+    let matchScore = calculateMatchScore(line, queryTerms);
+
+    if (matchScore > 0) {
+      const lineStart = Math.max(0, i - contextSize);
+      const lineEnd = Math.min(lines.length - 1, i + contextSize);
+      const segment = lines.slice(lineStart, lineEnd + 1).join("\n");
+
+      segments.push({
+        lineStart: lineStart + 1, // 1-based line numbers
+        lineEnd: lineEnd + 1,
+        segment,
+        score: matchScore,
+      });
+    }
+  }
+
+  return segments;
+}
+
+// Calculate match score for a line against query terms
+function calculateMatchScore(line: string, queryTerms: string[]): number {
+  let score = 0;
+  queryTerms.forEach((term) => {
+    if (line.includes(term)) {
+      score += 1;
+    }
+  });
+  return score;
 }
 
 // Process GitHub commits

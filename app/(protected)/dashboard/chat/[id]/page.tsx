@@ -7,6 +7,12 @@ import { useUser } from "@clerk/nextjs";
 import { Message, UserProfile } from "./types";
 import { getCodeSegment } from "./utils";
 import { getUserProfile } from "@/app/actions/user";
+// Import server actions directly
+import {
+  checkRagInitializationStatus,
+  initializeRepositoryRagAction,
+  queryRepositoryRagAction,
+} from "@/app/actions/rag";
 
 import { EmptyChat } from "./_components/EmptyChat";
 import { ChatMessage } from "./_components/ChatMessage";
@@ -83,14 +89,8 @@ export default function ChatPage() {
       if (!projectId) return; // Don't make API calls if no projectId
 
       try {
-        // Add API call to check if repository is initialized
-        const response = await fetch("/api/rag/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId }),
-        });
-
-        const data = await response.json();
+        // Use server action directly instead of API call
+        const data = await checkRagInitializationStatus(projectId);
         setIsInitialized(data.initialized);
       } catch (error) {
         console.error("Failed to check initialization status:", error);
@@ -111,16 +111,8 @@ export default function ChatPage() {
 
     setIsInitializing(true);
     try {
-      const response = await fetch("/api/rag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          action: "initialize",
-        }),
-      });
-
-      const result = await response.json();
+      // Use server action directly instead of API call
+      const result = await initializeRepositoryRagAction(projectId);
 
       if (result.success) {
         setIsInitialized(true);
@@ -188,6 +180,8 @@ export default function ChatPage() {
         content: msg.content,
       }));
 
+      // NOTE: Keep using the streaming API endpoint for streaming responses
+      // Server actions don't support streaming responses out of the box yet
       const response = await fetch("/api/rag/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -284,8 +278,12 @@ export default function ChatPage() {
 
     setMessages([]);
 
-    // Clear chat history on the server
+    // Note: You'll need to implement a clearChatHistory server action
     try {
+      // This would be replaced with a direct server action call
+      // await clearChatHistoryAction(projectId);
+
+      // Keep using the API for now since we haven't created the server action yet
       await fetch("/api/rag/clear-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
