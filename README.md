@@ -20,6 +20,28 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Error Handling
+
+This project includes comprehensive error handling middleware:
+
+- **AppError Class**: Custom error class for operational errors
+- **errorHandler**: Global error handling middleware
+- **asyncHandler**: Wrapper for async route handlers
+
+### Usage Example
+
+```typescript
+import { AppError, asyncHandler } from './middleware/errorHandler';
+
+app.get('/api/users/:id', asyncHandler(async (req, res) => {
+  const user = await findUser(req.params.id);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+  res.json(user);
+}));
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
